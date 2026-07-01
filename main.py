@@ -32,24 +32,28 @@ def extract(data: InvoiceRequest):
         }
 
     prompt = f"""
-Extract invoice information.
+        Extract the invoice information.
 
-Return ONLY JSON.
+        Return ONLY valid JSON.
 
-Fields:
-vendor
-amount
-currency
-date
+        Example:
 
-Currency must be uppercase 3-letter code.
+        {{
+        "vendor":"Acme Industries Ltd.",
+        "amount":1450.25,
+        "currency":"USD",
+        "date":"2026-08-19"
+        }}
 
-Date must be YYYY-MM-DD.
+        Rules:
+        - amount must be ONLY a number (no currency symbol or text)
+        - currency must be the 3-letter code
+        - date must be YYYY-MM-DD
+        - Do not include markdown or explanations.
 
-Invoice:
-
-{data.text}
-"""
+        Invoice:
+        {data.text}
+        """
 
     response = client.chat.completions.create(
         model="llama3.2",
