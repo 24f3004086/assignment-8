@@ -21,68 +21,54 @@ class InvoiceResponse(BaseModel):
 
 
 @app.post("/extract", response_model=InvoiceResponse)
-def extract(data: InvoiceRequest):
+def extract(request: InvoiceRequest):
 
-    if not data.text.strip():
-        return {
+    if not request.text.strip():
+        return InvoiceResponse(
+            vendor="",
+            amount=0,
+            currency="",
+            date=""
+        )
+
+    prompt = f"""
+Extract invoice information.
+
+Return ONLY valid JSON.
+
+{{
+  "vendor":"",
+  "amount":0,
+  "currency":"",
+  "date":"YYYY-MM-DD"
+}}
+
+Invoice:
+
+{request.text}
+"""
+
+    response = client.chat.completions.create(
+        model="llama3.2",
+        messages=[
+            {
+                "role":"user",
+                "content":prompt
+            }
+        ],
+        temperature=0
+    )
+
+    content = response.choices[0].message.content
+
+    try:
+        data = json.loads(content)
+    except:
+        data = {
             "vendor":"",
             "amount":0,
             "currency":"",
             "date":""
         }
 
-    prompt = f"""
-        Extract the invoice information.
-
-        Return ONLY valid JSON.
-
-        Example:
-
-        {{
-        "vendor":"Acme Industries Ltd.",
-        "amount":1450.25,
-        "currency":"USD",
-        "date":"2026-08-19"
-        }}
-
-        Rules:
-        - amount must be ONLY a number (no currency symbol or text)
-        - currency must be the 3-letter code
-        - date must be YYYY-MM-DD
-        - Do not include markdown or explanations.
-
-        Invoice:
-        {data.text}
-        """
-
-    response = client.chat.completions.create(
-    model="llama3.2",
-    messages=[
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
-    response_format={"type": "json_object"}
-)
-
-    result = response.choices[0].message.content
-
-    try:
-        result = result.strip()
-        if result.startswith("```"):
-            result = result.replace("```json", "")
-            result = result.replace("```", "")
-            result = result.strip()
-        parsed = json.loads(result)
-    except Exception as e:
-        print("JSON ERROR:", e)
-        print("LLM returned:", result)
-        return {
-            "vendor": "",
-            "amount": 0.0,
-            "currency": "",
-            "date": ""
-    }
-
-    return parsed
+    return InvoiceResponse(**data)
