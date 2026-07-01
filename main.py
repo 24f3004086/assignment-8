@@ -24,28 +24,38 @@ class InvoiceResponse(BaseModel):
 
 
 @app.post("/extract", response_model=InvoiceResponse)
-def extract(req: InvoiceRequest):
-
-    # Handle empty input safely
-    if not req.text.strip():
-        return InvoiceResponse(
-            vendor="",
-            amount=0,
-            currency="",
-            date=""
-        )
+def extract_json(text: str):
+    try:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1:
+            return None
+        return json.loads(text[start:end+1])
+    except:
+        return None
 
     prompt = f"""
-Extract invoice fields.
+        You are an invoice extraction engine.
 
-Return ONLY valid JSON:
+        You MUST return ONLY valid JSON. No text. No markdown. No explanation.
 
-{{"vendor":"","amount":0,"currency":"","date":""}}
+        Return format:
+        {{
+        "vendor": string,
+        "amount": number,
+        "currency": string,
+        "date": string
+        }}
 
-Invoice:
-{req.text}
-"""
+        Rules:
+        - vendor must be exact substring from invoice
+        - amount must be numeric only
+        - currency must be 3-letter uppercase (USD, EUR, GBP)
+        - date must be YYYY-MM-DD
 
+        Invoice:
+        {req.text}
+        """
     try:
         response = client.chat.completions.create(
             model="llama3.2",
