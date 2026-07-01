@@ -23,6 +23,8 @@ class InvoiceResponse(BaseModel):
 # 🔥 SAFE JSON PARSER (critical for grading)
 def extract_json(text: str):
     try:
+        print("RAW LLM OUTPUT >>>")
+        print(text)
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
             return None
