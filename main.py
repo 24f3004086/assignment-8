@@ -36,22 +36,11 @@ def extract(req: InvoiceRequest):
         )
 
     prompt = f"""
-You are an invoice extraction system.
+Extract invoice fields.
 
-Extract information and return ONLY valid JSON (no explanation, no markdown).
+Return ONLY valid JSON:
 
-Schema:
-{{
-  "vendor": string,
-  "amount": number,
-  "currency": string,
-  "date": "YYYY-MM-DD"
-}}
-
-Rules:
-- currency must be 3 uppercase letters
-- amount must be number only
-- date must be YYYY-MM-DD
+{{"vendor":"","amount":0,"currency":"","date":""}}
 
 Invoice:
 {req.text}
