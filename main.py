@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from openai import OpenAI
 import json
+import re
 
 app = FastAPI()
 
@@ -10,8 +11,10 @@ client = OpenAI(
     api_key="ollama"
 )
 
+
 class InvoiceRequest(BaseModel):
     text: str
+
 
 class InvoiceResponse(BaseModel):
     vendor: str
@@ -21,9 +24,10 @@ class InvoiceResponse(BaseModel):
 
 
 @app.post("/extract", response_model=InvoiceResponse)
-def extract(request: InvoiceRequest):
+def extract(req: InvoiceRequest):
 
-    if not request.text.strip():
+    # Handle empty input safely
+    if not req.text.strip():
         return InvoiceResponse(
             vendor="",
             amount=0,
@@ -32,43 +36,61 @@ def extract(request: InvoiceRequest):
         )
 
     prompt = f"""
-Extract invoice information.
+You are an invoice extraction system.
 
-Return ONLY valid JSON.
+Extract information and return ONLY valid JSON (no explanation, no markdown).
 
+Schema:
 {{
-  "vendor":"",
-  "amount":0,
-  "currency":"",
-  "date":"YYYY-MM-DD"
+  "vendor": string,
+  "amount": number,
+  "currency": string,
+  "date": "YYYY-MM-DD"
 }}
 
-Invoice:
+Rules:
+- currency must be 3 uppercase letters
+- amount must be number only
+- date must be YYYY-MM-DD
 
-{request.text}
+Invoice:
+{req.text}
 """
 
-    response = client.chat.completions.create(
-        model="llama3.2",
-        messages=[
-            {
-                "role":"user",
-                "content":prompt
-            }
-        ],
-        temperature=0
-    )
-
-    content = response.choices[0].message.content
-
     try:
-        data = json.loads(content)
-    except:
-        data = {
-            "vendor":"",
-            "amount":0,
-            "currency":"",
-            "date":""
-        }
+        response = client.chat.completions.create(
+            model="llama3.2",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0
+        )
 
-    return InvoiceResponse(**data)
+        text = response.choices[0].message.content
+
+        # Remove markdown if model returns ```json
+        text = re.sub(r"^```json", "", text)
+        text = re.sub(r"```$", "", text)
+        text = text.strip()
+
+        data = json.loads(text)
+        print("RAW MODEL OUTPUT:")
+        print(text)
+        return InvoiceResponse(
+            vendor=data.get("vendor", ""),
+            amount=float(data.get("amount", 0)),
+            currency=data.get("currency", "").upper(),
+            date=data.get("date", "")
+        )
+
+    except Exception:
+        # Never return HTTP 500
+        return InvoiceResponse(
+            vendor="",
+            amount=0,
+            currency="",
+            date=""
+        )
