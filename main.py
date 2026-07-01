@@ -56,25 +56,33 @@ def extract(data: InvoiceRequest):
         """
 
     response = client.chat.completions.create(
-        model="llama3.2",
-        messages=[
-            {
-                "role":"user",
-                "content":prompt
-            }
-        ]
-    )
+    model="llama3.2",
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+    response_format={"type": "json_object"}
+)
 
     result = response.choices[0].message.content
 
     try:
+        result = result.strip()
+        if result.startswith("```"):
+            result = result.replace("```json", "")
+            result = result.replace("```", "")
+            result = result.strip()
         parsed = json.loads(result)
-    except:
-        parsed = {
-            "vendor":"",
-            "amount":0,
-            "currency":"",
-            "date":""
-        }
+    except Exception as e:
+        print("JSON ERROR:", e)
+        print("LLM returned:", result)
+        return {
+            "vendor": "",
+            "amount": 0.0,
+            "currency": "",
+            "date": ""
+    }
 
     return parsed
